@@ -1,0 +1,33 @@
+{
+  "name": "electron-markup-viewer",
+  "version": "1.0.0",
+  "description": "A simple markup viewer built with Electron",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "postInstall": "electron-rebuild",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cicerorfonseca/electron-markup-viewer.git"
+  },
+  "author": "Cicero Raldi Da Fonseca",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cicerorfonseca/electron-markup-viewer/issues"
+  },
+  "homepage": "https://github.com/cicerorfonseca/electron-markup-viewer#readme",
+  "devDependencies": {
+    "babel-eslint": "^10.1.0",
+    "devtron": "^1.4.0",
+    "electron-packager": "^15.4.0",
+    "eslint": "^8.7.0",
+    "eslint-plugin-import": "^2.25.4"
+  },
+  "dependencies": {
+    "@electron/remote": "^2.0.4",
+    "electron": "^16.0.8",
+    "marked": "^4.0.12"
+  }
+}
