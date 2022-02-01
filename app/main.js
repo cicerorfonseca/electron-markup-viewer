@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, Menu } = require('electron');
 const remoteMain = require('@electron/remote/main');
 remoteMain.initialize();
 const fs = require('fs'); //filesystem
@@ -7,6 +7,62 @@ const fs = require('fs'); //filesystem
 // everything in there will be eligible for garbage collection, which means it could cease
 // to exist at anytime
 let mainWindow = null;
+
+// Create top bar menu
+// Creating a custom one will take off all the existing ones including shortcuts
+const menuTemplate = [
+  {
+    label: 'File',
+    submenu: [
+      {
+        label: 'Open File',
+        accelerator: 'CommandOrControl+O',
+        click() {
+          exports.getFileFromUser();
+        },
+      },
+      {
+        label: 'Save File',
+        accelerator: 'CommandOrControl+S',
+        click() {
+          mainWindow.webContents.send('save-markdown');
+        },
+      },
+      {
+        label: 'Save HTML',
+        accelerator: 'CommandOrControl+Shift+S',
+        click() {
+          mainWindow.webContents.send('save-html');
+        },
+      },
+      {
+        label: 'Copy',
+        role: 'copy',
+      },
+    ],
+  },
+];
+
+//MacOs only. Add a new item to the beggining of the menu application.
+if (process.platform === 'darwin') {
+  const applicationName = 'Markdown Viewer';
+
+  menuTemplate.unshift({
+    label: applicationName,
+    submenu: [
+      {
+        label: `About ${applicationName}`,
+        role: 'about',
+      },
+      {
+        label: `Quit ${applicationName}`,
+        role: 'quit',
+      },
+    ],
+  });
+}
+
+const applicationMenu = Menu.buildFromTemplate(menuTemplate);
 
 app.on('ready', () => {
   // It has been declares globally to avoid the window from garbage collection
@@ -18,6 +74,9 @@ app.on('ready', () => {
     },
     show: false,
   });
+
+  // Initialize menu. Depending on the OS you're on you might see a slightly different version
+  Menu.setApplicationMenu(applicationMenu);
 
   remoteMain.enable(mainWindow.webContents);
 
@@ -36,7 +95,7 @@ app.on('ready', () => {
 exports.getFileFromUser = () => {
   dialog
     // https://www.electronjs.org/docs/latest/api/dialog#dialogshowopendialogbrowserwindow-options
-    .showOpenDialog({
+    .showOpenDialog(mainWindow, {
       properties: ['openFile'],
       filters: [
         { name: 'Markdown Files', extensions: ['md', 'mdown', 'markdown'] },
@@ -55,13 +114,58 @@ exports.getFileFromUser = () => {
     });
 };
 
-const openFile = (file) => {
+exports.saveMarkdown = (file, content) => {
+  // TODO: Fix saving existing file
+
+  if (!file) {
+    dialog
+      .showSaveDialog(mainWindow, {
+        title: 'Save Markdown',
+        defaultPath: app.getPath('desktop'),
+        filters: [
+          { name: 'Markdown Files', extensions: ['md', 'markdown', 'mdown'] },
+        ],
+      })
+      .then((res) => {
+        fs.writeFileSync(res.filePath, content);
+        openFile(res.filePath);
+      });
+    // .catch((err) => {
+    //   console.log(err);
+    //   return;
+    // });
+  }
+
+  if (!file) return;
+
+  fs.writeFileSync(file, content);
+  openFile(file);
+};
+
+exports.saveHtml = (content) => {
+  dialog
+    .showSaveDialog(mainWindow, {
+      title: 'Save HTML',
+      defaultPath: app.getPath('desktop'),
+      filters: [{ name: 'HTML Files', extensions: ['htm', 'html'] }],
+    })
+    .then((res) => {
+      fs.writeFileSync(res.filePath, content);
+    });
+};
+
+// This sintax allows us to use the function within this main process and also exports it to the renderer
+// It will first take the function and assign it to exports.openFile and then assign it to openFile
+const openFile = (exports.openFile = (file) => {
   // use readFileSync with caution because it blocks the main process until it reads the file
   // it could be problematic if the file is too big
   // in production try to use a different method with callbacks
   const content = fs.readFileSync(file).toString();
 
+  // Add the doc to the right click recent documents on the icon
+  app.addRecentDocument(file);
+
   // Send it to the listener (renderer) using IPC - Inter Process Communication
   // Just an arbitrary text to identify what kind of messa you're sending to the renderer process
   mainWindow.webContents.send('file-opened', file, content);
-};
+});
